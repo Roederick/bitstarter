@@ -24,8 +24,11 @@ References:
 var fs = require('fs');
 var program = require('commander');
 var cheerio = require('cheerio');
-var HTMLFILE_DEFAULT = "index.html";
+var rest = require('restler');
+var HTMLFILE_DEFAULT = "indexfg.html";
 var CHECKSFILE_DEFAULT = "checks.json";
+var URL_DEFAULT = 'http://afternoon-hollows-9171.herokuapp.com'
+var TMPFILE = './tmp.tmp'
 
 var assertFileExists = function(infile) {
     var instr = infile.toString();
@@ -34,6 +37,16 @@ var assertFileExists = function(infile) {
         process.exit(1); // http://nodejs.org/api/process.html#process_process_exit_code
     }
     return instr;
+};
+
+var assertUrlExists = function(infile) {
+    /*var instr = infile.toString();
+    if(!fs.existsSync(instr)) {
+        console.log("%s does not exist. Exiting.", instr);
+        process.exit(1); // http://nodejs.org/api/process.html#process_process_exit_code
+    }
+    return instr;*/
+	return infile;
 };
 
 var cheerioHtmlFile = function(htmlfile) {
@@ -45,7 +58,7 @@ var loadChecks = function(checksfile) {
 };
 
 var checkHtmlFile = function(htmlfile, checksfile) {
-    $ = cheerioHtmlFile(htmlfile);
+	$ = cheerioHtmlFile(htmlfile);
     var checks = loadChecks(checksfile).sort();
     var out = {};
     for(var ii in checks) {
@@ -54,6 +67,29 @@ var checkHtmlFile = function(htmlfile, checksfile) {
     }
     return out;
 };
+
+restlerHtmlFile = function(url) {
+	return rest.get(url);
+}
+
+/*var checkUrlFile = function(url, checksfile) {
+    htmlFile = rest.get(url).on('complete', function(result) {
+        if (result instanceof Error) {
+            console.log('Error: ' + result.message);
+        } else {
+            fs.writeFileSync(TMPFILE, result);
+            return TMPFILE;
+        }
+    });  
+    //$ = cheerioHtmlFile(htmlFile)	
+    var checks = loadChecks(checksfile).sort();
+    var out = {};
+    for(var ii in checks) {
+        var present = (checks[ii]).length > 0;
+        out[checks[ii]] = present;
+    }
+    return out;
+}*/
 
 var clone = function(fn) {
     // Workaround for commander.js issue.
@@ -65,8 +101,24 @@ if(require.main == module) {
     program
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
         .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
+		.option('-u, --url <url>', 'Url to page', clone(assertUrlExists), URL_DEFAULT)
         .parse(process.argv);
-    var checkJson = checkHtmlFile(program.file, program.checks);
+    var checkJson = ""
+	if ((process.argv.indexOf('-f') != -1) || (process.argv.indexOf("--file") != -1)) {
+		checkJson = checkHtmlFile(program.file, program.checks);
+	} else {
+        rest.get(program.url).on('complete', function(result) {
+            if (result instanceof Error) {
+                console.log('Error: ' + result.message);
+            } else {
+                fs.writeFileSync(TMPFILE, result);
+                return TMPFILE;
+            }
+        });
+        checkJson = checkHtmlFile(TMPFILE, program.checks);
+	}
+	//console.log(process.argv.indexOf("-c"));
+	//console.log(process.argv);
     var outJson = JSON.stringify(checkJson, null, 4);
     console.log(outJson);
 } else {
